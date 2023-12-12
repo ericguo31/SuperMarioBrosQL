@@ -74,4 +74,4 @@ def main():
 
 
 # explicitly define the outward facing API of this module
-# __all__ = [main.__name__]
+__all__ = [main.__name__]
