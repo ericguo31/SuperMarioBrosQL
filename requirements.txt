@@ -10,5 +10,8 @@ setuptools>=39.0.1
 tqdm>=4.19.5
 twine>=1.11.0
 gym-super-mario-bros
-matplotlib
+
 # other
+imageio[tifffile]
+imageio[ffmpeg]
+matplotlib

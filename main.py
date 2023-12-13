@@ -1,5 +1,9 @@
 import argparse
 import dqn
+import os
+import imageio
+from PIL import Image
+import PIL.ImageDraw as ImageDraw 
 from env_maker import make_env
 import torch
 import torch.nn as nn
@@ -49,7 +53,8 @@ def run(args):
     num_episodes = eps
     env.reset()
     total_rewards = []
-    
+
+    frames = []
     for ep_num in tqdm(range(num_episodes)):
         state = env.reset()
         state = torch.Tensor([state])
@@ -61,6 +66,22 @@ def run(args):
             action = agent.act(state)
             steps += 1
             
+            # Encode frames for output .mp4
+            action1 = env.action_space.sample()
+            frame = env.render(mode='rgb_array')
+            im = Image.fromarray(frame)
+
+            drawer = ImageDraw.Draw(im)
+
+            if np.mean(im) < 128:
+                text_color = (255,255,255)
+            else:
+                text_color = (0,0,0)
+            drawer.text((im.size[0]/20,im.size[1]/18), f'Episode: {ep_num+1}', fill=text_color)
+
+            frames.append(im)
+            
+            # Update state, reward and determine if end condition is met
             state_next, reward, terminal, info = env.step(int(action[0]))
             total_reward += reward
             state_next = torch.Tensor([state_next])
@@ -80,6 +101,7 @@ def run(args):
 
         print("Total reward after episode {} is {}".format(ep_num + 1, total_rewards[-1]))
 
+        # Write outputs if we train the agent
         if training_mode:
             ending_position_pkl = append_file_name("ending_position", double_dq, ".pkl")
             num_in_queue_pkl = append_file_name("num_in_queue", double_dq, ".pkl")
@@ -112,6 +134,9 @@ def run(args):
 
     
     env.close()
+
+    agent_mp4 = append_file_name("agent", double_dq, ".mp4")
+    imageio.mimwrite(agent_mp4, frames)
     
     if num_episodes > 500:
         plt.title("Episodes trained vs. Average Rewards (per 500 eps)")

@@ -140,3 +140,5 @@ ENV/
 # ignore .pt and .pkl files for now
 *.pt
 *.pkl
+*.gif
+*.mp4
