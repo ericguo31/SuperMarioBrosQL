@@ -138,5 +138,5 @@ ENV/
 # STATE2_MEM.pt
 
 # ignore .pt and .pkl files for now
-.pt
-.pkl
+*.pt
+*.pkl
