@@ -133,6 +133,10 @@ ENV/
 # mypy
 .mypy_cache/
 
-# ignore state memory files created from running agent
-STATE_MEM.pt
-STATE2_MEM.pt
+# # ignore state memory files created from running agent
+# STATE_MEM.pt
+# STATE2_MEM.pt
+
+# ignore .pt and .pkl files for now
+.pt
+.pkl

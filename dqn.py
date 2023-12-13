@@ -73,14 +73,30 @@ class DQNAgent:
         # Create memory
         self.max_memory_size = max_memory_size
         if self.pretrained:
-            self.STATE_MEM = torch.load("STATE_MEM.pt")
-            self.ACTION_MEM = torch.load("ACTION_MEM.pt")
-            self.REWARD_MEM = torch.load("REWARD_MEM.pt")
-            self.STATE2_MEM = torch.load("STATE2_MEM.pt")
-            self.DONE_MEM = torch.load("DONE_MEM.pt")
-            with open("ending_position.pkl", 'rb') as f:
+            if self.double_dq:
+              STATE_MEM_pt = "STATE_MEM_ddqn.pt"
+              ACTION_MEM_pt = "ACTION_MEM_ddqn.pt"
+              REWARD_MEM_pt = "REWARD_MEM_ddqn.pt"
+              STATE2_MEM_pt = "STATE2_MEM_ddqn.pt"
+              DONE_MEM_pt = "DONE_MEM_ddqn.pt"
+              ending_position_pkl = "ending_position_ddqn.pkl"
+              num_in_queue_pkl = "num_in_queue_ddqn.pkl"
+            else:
+              STATE_MEM_pt = "STATE_MEM_dqn.pt"
+              ACTION_MEM_pt = "ACTION_MEM_dqn.pt"
+              REWARD_MEM_pt = "REWARD_MEM_dqn.pt"
+              STATE2_MEM_pt = "STATE2_MEM_dqn.pt"
+              DONE_MEM_pt = "DONE_MEM_dqn.pt"
+              ending_position_pkl = "ending_position_dqn.pkl"
+              num_in_queue_pkl = "num_in_queue_dqn.pkl"
+            self.STATE_MEM = torch.load(STATE_MEM_pt)
+            self.ACTION_MEM = torch.load(ACTION_MEM_pt)
+            self.REWARD_MEM = torch.load(REWARD_MEM_pt)
+            self.STATE2_MEM = torch.load(STATE2_MEM_pt)
+            self.DONE_MEM = torch.load(DONE_MEM_pt)
+            with open(ending_position_pkl, 'rb') as f:
                 self.ending_position = pickle.load(f)
-            with open("num_in_queue.pkl", 'rb') as f:
+            with open(num_in_queue_pkl, 'rb') as f:
                 self.num_in_queue = pickle.load(f)
         else:
             self.STATE_MEM = torch.zeros(max_memory_size, *self.state_space)

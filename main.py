@@ -16,9 +16,19 @@ import cv2
 import matplotlib.pyplot as plt
 from super_mario_bros.gym_super_mario_bros._app import cli
 
-def run(training_mode, pretrained, env, eps):
+def run(args):
     """
     """
+    training_mode=args.training_mode
+    pretrained=args.pretrained
+    env=args.env
+    eps=args.episodes
+    if args.algorithm == 'ddqn':
+        double_dq = True
+    elif args.algorithm == 'dqn':
+        double_dq = False
+
+
     env = gym.make(env)
     env = make_env(env)  # pre-process env for deep learning
     observation_space = env.observation_space.shape
@@ -33,7 +43,7 @@ def run(training_mode, pretrained, env, eps):
                         exploration_max=1.0,
                         exploration_min=0.02,
                         exploration_decay=0.99,
-                        double_dq=True,
+                        double_dq=double_dq,
                         pretrained=pretrained)
     
     num_episodes = eps
@@ -69,25 +79,37 @@ def run(training_mode, pretrained, env, eps):
         total_rewards.append(total_reward)
 
         print("Total reward after episode {} is {}".format(ep_num + 1, total_rewards[-1]))
+
+        if training_mode:
+            ending_position_pkl = append_file_name("ending_position", double_dq, ".pkl")
+            num_in_queue_pkl = append_file_name("num_in_queue", double_dq, ".pkl")
+            total_rewards_pkl = append_file_name("total_rewards", double_dq, ".pkl")
+            with open(ending_position_pkl, "wb") as f:
+                pickle.dump(agent.ending_position, f)
+            with open(num_in_queue_pkl, "wb") as f:
+                pickle.dump(agent.num_in_queue, f)
+            with open(total_rewards_pkl, "wb") as f:
+                pickle.dump(total_rewards, f)
+
+            if agent.double_dq:
+                torch.save(agent.local_net.state_dict(), "dq1.pt")
+                torch.save(agent.target_net.state_dict(), "dq2.pt")
+            else:
+                torch.save(agent.dqn.state_dict(), "dq.pt")
+
+            STATE_MEM_pt = append_file_name("STATE_MEM", double_dq, ".pt")
+            ACTION_MEM_pt = append_file_name("ACTION_MEM", double_dq, ".pt")
+            REWARD_MEM_pt = append_file_name("REWARD_MEM", double_dq, ".pt")
+            STATE2_MEM_pt = append_file_name("STATE2_MEM", double_dq, ".pt")
+            DONE_MEM_pt = append_file_name("DONE_MEM", double_dq, ".pt")
+            torch.save(agent.STATE_MEM,  STATE_MEM_pt)
+            torch.save(agent.ACTION_MEM, ACTION_MEM_pt)
+            torch.save(agent.REWARD_MEM, REWARD_MEM_pt)
+            torch.save(agent.STATE2_MEM, STATE2_MEM_pt)
+            torch.save(agent.DONE_MEM,   DONE_MEM_pt)
+
         num_episodes += 1      
-    
-    if training_mode:
-        with open("ending_position.pkl", "wb") as f:
-            pickle.dump(agent.ending_position, f)
-        with open("num_in_queue.pkl", "wb") as f:
-            pickle.dump(agent.num_in_queue, f)
-        with open("total_rewards.pkl", "wb") as f:
-            pickle.dump(total_rewards, f)
-        if agent.double_dq:
-            torch.save(agent.local_net.state_dict(), "dq1.pt")
-            torch.save(agent.target_net.state_dict(), "dq2.pt")
-        else:
-            torch.save(agent.dqn.state_dict(), "dq.pt")  
-        torch.save(agent.STATE_MEM,  "STATE_MEM.pt")
-        torch.save(agent.ACTION_MEM, "ACTION_MEM.pt")
-        torch.save(agent.REWARD_MEM, "REWARD_MEM.pt")
-        torch.save(agent.STATE2_MEM, "STATE2_MEM.pt")
-        torch.save(agent.DONE_MEM,   "DONE_MEM.pt")
+
     
     env.close()
     
@@ -107,14 +129,31 @@ def show_state(env, ep=0, info=""):
     display.clear_output(wait=True)
     display.display(plt.gcf())
 
+def append_file_name(basename, is_ddqn, file_ext):
+    """
+    Transforms given basename into a file name to specify if file relates to ddqn or dqn result.
+
+    basename (string): basename for file output
+    is_dqqn (bool): true if result of ddqn, false otherwise
+    file_ext (string): file extension for output (MUST INCLUDE ".", e.g. ".pkl" or ".pt")
+    """
+    ddqn = "_ddqn" if is_ddqn else "_dqn"
+    return basename + ddqn + file_ext
+
+def plot(total_rewards):
+    # NEED TO CHECK UNPICKLE OR JUST A LIST
+    plt.title("Episodes trained vs. Average Rewards (per 500 eps)")
+    plt.plot([0 for _ in range(500)] + 
+            np.convolve(total_rewards, np.ones((500,))/500, mode="valid").tolist())
+    plt.show()
+
 def main(args):
     """
     [INSERT DOCUMENTATION]
     """
     if args.mode == 'agent':
-        print("hurray")
         args.env = 'SuperMarioBros-1-1-v0'
-        run(training_mode=args.training_mode, pretrained=args.pretrained, env=args.env, eps=args.episodes)
+        run(args)
     else:
         cli.main()
 
@@ -136,6 +175,12 @@ if __name__ == "__main__":
     parser.add_argument('--episodes', '-eps',
         type=int,
         help='The number of agent-environment interactions from initial to final states'
+    )
+    parser.add_argument('--algorithm', '-alg',
+        type=str,
+        default='ddqn',
+        choices=['ddqn', 'dqn'],
+        help='ddqn for Double Deep Q-Network; dqn for Deep Q-Network'
     )
     parser.add_argument('--env', '-e',
         type=str,
