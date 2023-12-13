@@ -12,3 +12,6 @@ twine>=1.11.0
 gym-super-mario-bros
 
 # other
+imageio[tifffile]
+imageio[ffmpeg]
+matplotlib
