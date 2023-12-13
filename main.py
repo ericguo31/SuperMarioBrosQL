@@ -52,12 +52,21 @@ def run(args):
     
     num_episodes = eps
     env.reset()
-    total_rewards = []
+    if args.pretrained:
+        if args.algorithm == 'ddqn':
+            total_rewards_pkl = "total_rewards_ddqn.pkl"
+        elif args.algorithm == 'dqn':
+            total_rewards_pkl = "total_rewards_dqn.pkl"
+        with open(total_rewards_pkl, 'rb') as f:
+            total_rewards = pickle.load(f)
+    else:
+        total_rewards = []
 
     frames = []
     for ep_num in tqdm(range(num_episodes)):
         state = env.reset()
-        state = torch.Tensor([state])
+        state = np.array([state])
+        state = torch.Tensor(state)
         total_reward = 0
         steps = 0
         while True:
@@ -83,8 +92,10 @@ def run(args):
             
             # Update state, reward and determine if end condition is met
             state_next, reward, terminal, info = env.step(int(action[0]))
+            print(info)
             total_reward += reward
-            state_next = torch.Tensor([state_next])
+            state_next = np.array([state_next])
+            state_next = torch.Tensor(state_next)
             reward = torch.tensor([reward]).unsqueeze(0)
             
             terminal = torch.tensor([int(terminal)]).unsqueeze(0)
@@ -101,48 +112,49 @@ def run(args):
 
         print("Total reward after episode {} is {}".format(ep_num + 1, total_rewards[-1]))
 
-        # Write outputs if we train the agent
-        if training_mode:
-            ending_position_pkl = append_file_name("ending_position", double_dq, ".pkl")
-            num_in_queue_pkl = append_file_name("num_in_queue", double_dq, ".pkl")
-            total_rewards_pkl = append_file_name("total_rewards", double_dq, ".pkl")
-            with open(ending_position_pkl, "wb") as f:
-                pickle.dump(agent.ending_position, f)
-            with open(num_in_queue_pkl, "wb") as f:
-                pickle.dump(agent.num_in_queue, f)
-            with open(total_rewards_pkl, "wb") as f:
-                pickle.dump(total_rewards, f)
-
-            if agent.double_dq:
-                torch.save(agent.local_net.state_dict(), "dq1.pt")
-                torch.save(agent.target_net.state_dict(), "dq2.pt")
-            else:
-                torch.save(agent.dqn.state_dict(), "dq.pt")
-
-            STATE_MEM_pt = append_file_name("STATE_MEM", double_dq, ".pt")
-            ACTION_MEM_pt = append_file_name("ACTION_MEM", double_dq, ".pt")
-            REWARD_MEM_pt = append_file_name("REWARD_MEM", double_dq, ".pt")
-            STATE2_MEM_pt = append_file_name("STATE2_MEM", double_dq, ".pt")
-            DONE_MEM_pt = append_file_name("DONE_MEM", double_dq, ".pt")
-            torch.save(agent.STATE_MEM,  STATE_MEM_pt)
-            torch.save(agent.ACTION_MEM, ACTION_MEM_pt)
-            torch.save(agent.REWARD_MEM, REWARD_MEM_pt)
-            torch.save(agent.STATE2_MEM, STATE2_MEM_pt)
-            torch.save(agent.DONE_MEM,   DONE_MEM_pt)
-
         num_episodes += 1      
 
+    # Write outputs if we train the agent
+    if training_mode:
+        ending_position_pkl = append_file_name("ending_position", double_dq, ".pkl")
+        num_in_queue_pkl = append_file_name("num_in_queue", double_dq, ".pkl")
+        total_rewards_pkl = append_file_name("total_rewards", double_dq, ".pkl")
+        with open(ending_position_pkl, "wb") as f:
+            pickle.dump(agent.ending_position, f)
+        with open(num_in_queue_pkl, "wb") as f:
+            pickle.dump(agent.num_in_queue, f)
+        with open(total_rewards_pkl, "wb") as f:
+            pickle.dump(total_rewards, f)
+
+        if agent.double_dq:
+            torch.save(agent.local_net.state_dict(), "dq1.pt")
+            torch.save(agent.target_net.state_dict(), "dq2.pt")
+        else:
+            torch.save(agent.dqn.state_dict(), "dq.pt")
+
+        STATE_MEM_pt = append_file_name("STATE_MEM", double_dq, ".pt")
+        ACTION_MEM_pt = append_file_name("ACTION_MEM", double_dq, ".pt")
+        REWARD_MEM_pt = append_file_name("REWARD_MEM", double_dq, ".pt")
+        STATE2_MEM_pt = append_file_name("STATE2_MEM", double_dq, ".pt")
+        DONE_MEM_pt = append_file_name("DONE_MEM", double_dq, ".pt")
+        torch.save(agent.STATE_MEM,  STATE_MEM_pt)
+        torch.save(agent.ACTION_MEM, ACTION_MEM_pt)
+        torch.save(agent.REWARD_MEM, REWARD_MEM_pt)
+        torch.save(agent.STATE2_MEM, STATE2_MEM_pt)
+        torch.save(agent.DONE_MEM,   DONE_MEM_pt)
     
     env.close()
 
     agent_mp4 = append_file_name("agent", double_dq, ".mp4")
     imageio.mimwrite(agent_mp4, frames)
     
-    if num_episodes > 500:
+    if num_episodes >= 5:
         plt.title("Episodes trained vs. Average Rewards (per 500 eps)")
         plt.plot([0 for _ in range(500)] + 
                  np.convolve(total_rewards, np.ones((500,))/500, mode="valid").tolist())
         plt.show()
+        reward_plot = append_file_name("plot", double_dq, ".png")
+        plt.savefig()
 
 def show_state(env, ep=0, info=""):
     plt.figure(3)
@@ -171,6 +183,8 @@ def plot(total_rewards):
     plt.plot([0 for _ in range(500)] + 
             np.convolve(total_rewards, np.ones((500,))/500, mode="valid").tolist())
     plt.show()
+    plt.savefig('')
+    
 
 def main(args):
     """
