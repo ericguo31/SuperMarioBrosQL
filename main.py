@@ -16,7 +16,7 @@ import cv2
 import matplotlib.pyplot as plt
 from super_mario_bros.gym_super_mario_bros._app import cli
 
-def run(training_mode, pretrained, env):
+def run(training_mode, pretrained, env, eps):
     """
     """
     env = gym.make(env)
@@ -36,7 +36,7 @@ def run(training_mode, pretrained, env):
                         double_dq=True,
                         pretrained=pretrained)
     
-    num_episodes = 5
+    num_episodes = eps
     env.reset()
     total_rewards = []
     
@@ -114,7 +114,7 @@ def main(args):
     if args.mode == 'agent':
         print("hurray")
         args.env = 'SuperMarioBros-1-1-v0'
-        run(training_mode=args.training_mode, pretrained=args.pretrained, env=args.env)
+        run(training_mode=args.training_mode, pretrained=args.pretrained, env=args.env, eps=args.episodes)
     else:
         cli.main()
 
@@ -132,6 +132,10 @@ if __name__ == "__main__":
         default=False,
         choices=[True, False],
         help='True if DQN agent is run on pretrained weights'
+    )
+    parser.add_argument('--episodes', '-eps',
+        type=int,
+        help='The number of agent-environment interactions from initial to final states'
     )
     parser.add_argument('--env', '-e',
         type=str,
