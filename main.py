@@ -31,7 +31,12 @@ def run(args):
     if args.algorithm == "random":
         env = JoypadSpace(env, RIGHT_ONLY)
         frames = []
-        total_rewards = []
+        if args.pretrained:
+            total_rewards_pkl = append_file_name("total_rewards", args.algorithm, ".pkl")
+            with open(total_rewards_pkl, 'rb') as f:
+                total_rewards = pickle.load(f)
+        else:
+            total_rewards = []
         for ep_num in tqdm(range(num_episodes)):
             _ = env.reset()
             terminal = False
@@ -62,6 +67,9 @@ def run(args):
                 progress.set_postfix(reward=reward, info=info)
                 # env.render()
             total_rewards.append(total_reward)
+            total_rewards_pkl = append_file_name("total_rewards", args.algorithm, ".pkl")
+            with open(total_rewards_pkl, "wb") as f:
+                pickle.dump(total_rewards, f)
         
         # close the environment
         env.close()

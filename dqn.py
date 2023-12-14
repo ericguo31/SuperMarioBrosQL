@@ -148,9 +148,16 @@ class DQNAgent:
         
         return STATE, ACTION, REWARD, STATE2, DONE
 
+    def copy_model(self):
+        """
+        Copy local network weights into target network. Used for DDQN.
+        """
+        self.target_net.load_state_dict(self.local_net.state_dict())
+
     def act(self, state):
-        # Epsilon-greedy action
-        
+        """
+        Epsilon-greedy action. Policy to determine action is dependent on if DDQN.
+        """
         if self.double_dq:
             self.step += 1
         if random.random() < self.exploration_rate:  
@@ -160,11 +167,6 @@ class DQNAgent:
             return torch.argmax(self.local_net(state.to(self.device))).unsqueeze(0).unsqueeze(0).cpu()
         else:
             return torch.argmax(self.dqn(state.to(self.device))).unsqueeze(0).unsqueeze(0).cpu()
-
-    def copy_model(self):
-        # Copy local net weights into target net
-        
-        self.target_net.load_state_dict(self.local_net.state_dict())
     
     def experience_replay(self):
         """
