@@ -13,12 +13,12 @@ import cv2
 import matplotlib.pyplot as plt
 
 class MaxAndSkipEnv(gym.Wrapper):
-    def __init__(self, env=None, skip=4):
-        """Return only every `skip`-th frame"""
+    def __init__(self, env=None, n=4):
+        """Return only every n-th frame"""
         super(MaxAndSkipEnv, self).__init__(env)
         # most recent raw observations (for max pooling across time steps)
         self._obs_buffer = collections.deque(maxlen=2)
-        self._skip = skip
+        self._skip = n
 
     def step(self, action):
         total_reward = 0.0
@@ -29,7 +29,7 @@ class MaxAndSkipEnv(gym.Wrapper):
             total_reward += reward
             if done:
                 break
-        max_frame = np.max(np.stack(self._obs_buffer), axis=0)
+        max_frame = np.max(np.stack(self._obs_buffer), axis=0) # max pooling
         return max_frame, total_reward, done, info
 
     def reset(self):
@@ -42,10 +42,9 @@ class MaxAndSkipEnv(gym.Wrapper):
 
 class ProcessFrame84(gym.ObservationWrapper):
     """
-    Downsamples image to 84x84
-    Greyscales image
+    Downsamples image to 84x84 and greyscales image
 
-    Returns numpy array
+    Returns: numpy array
     """
     def __init__(self, env=None):
         super(ProcessFrame84, self).__init__(env)
@@ -63,11 +62,14 @@ class ProcessFrame84(gym.ObservationWrapper):
         img = img[:, :, 0] * 0.299 + img[:, :, 1] * 0.587 + img[:, :, 2] * 0.114
         resized_screen = cv2.resize(img, (84, 110), interpolation=cv2.INTER_AREA)
         x_t = resized_screen[18:102, :]
-        x_t = np.reshape(x_t, [84, 84, 1])
+        x_t = np.reshape(x_t, [84, 84, 1]) # reduce frame to 84x84
         return x_t.astype(np.uint8)
 
 
 class ImageToPyTorch(gym.ObservationWrapper):
+    """
+    Convert images to PyTorch tensors
+    """
     def __init__(self, env):
         super(ImageToPyTorch, self).__init__(env)
         old_shape = self.observation_space.shape
@@ -79,12 +81,15 @@ class ImageToPyTorch(gym.ObservationWrapper):
 
 
 class ScaledFloatFrame(gym.ObservationWrapper):
-    """Normalize pixel values in frame --> 0 to 1"""
+    """Normalize image pixel values in frame from 0 to 1"""
     def observation(self, obs):
         return np.array(obs).astype(np.float32) / 255.0
 
 
 class BufferWrapper(gym.ObservationWrapper):
+    """
+    Apply buffer of n_steps for temporal information about the environment
+    """
     def __init__(self, env, n_steps, dtype=np.float32):
         super(BufferWrapper, self).__init__(env)
         self.dtype = dtype
@@ -97,6 +102,9 @@ class BufferWrapper(gym.ObservationWrapper):
         return self.observation(self.env.reset())
 
     def observation(self, observation):
+        """
+        Update buffer by sliding left by 1
+        """
         self.buffer[:-1] = self.buffer[1:]
         self.buffer[-1] = observation
         return self.buffer
@@ -108,4 +116,4 @@ def make_env(env):
     env = ImageToPyTorch(env)
     env = BufferWrapper(env, 4)
     env = ScaledFloatFrame(env)
-    return JoypadSpace(env, RIGHT_ONLY)
+    return JoypadSpace(env, RIGHT_ONLY) # specify the agent cannot move left

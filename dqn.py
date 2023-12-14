@@ -11,7 +11,12 @@ import cv2
 import matplotlib.pyplot as plt
 
 class DQNSolver(nn.Module):
-
+    """
+    The Deep Q-Network is created as a 5-layer CNN (convolutional neural net) with 
+    three convolutional layers and two linear layers, which works well for image-based 
+    problems. By pre-processing env, we converted a 240x256x3 (h x w x RGB) image from
+    the game into 
+    """
     def __init__(self, input_shape, n_actions):
         super(DQNSolver, self).__init__()
         self.conv = nn.Sequential(
@@ -45,12 +50,13 @@ class DQNAgent:
                  dropout, exploration_max, exploration_min, exploration_decay, double_dq, pretrained):
 
         # Define DQN Layers
-        self.state_space = state_space
-        self.action_space = action_space
+        self.state_space = state_space # dimensions
+        self.action_space = action_space # num of discrete actions
         self.double_dq = double_dq
         self.pretrained = pretrained
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         if self.double_dq:  
+            # define local and target Q-network for updating and action selecting
             self.local_net = DQNSolver(state_space, action_space).to(self.device)
             self.target_net = DQNSolver(state_space, action_space).to(self.device)
             
@@ -109,13 +115,17 @@ class DQNAgent:
         
         # Learning parameters
         self.gamma = gamma
-        self.l1 = nn.SmoothL1Loss().to(self.device) # Also known as Huber loss
+        self.l1 = nn.SmoothL1Loss().to(self.device) # Huber loss
         self.exploration_max = exploration_max
         self.exploration_rate = exploration_max
         self.exploration_min = exploration_min
         self.exploration_decay = exploration_decay
 
     def remember(self, state, action, reward, state2, done):
+        """
+        Stores experience (self, state, action, reward, state2, done) in a buffer 
+        to use later for supervised learning of the CNN.
+        """
         self.STATE_MEM[self.ending_position] = state.float()
         self.ACTION_MEM[self.ending_position] = action.float()
         self.REWARD_MEM[self.ending_position] = reward.float()
@@ -125,7 +135,9 @@ class DQNAgent:
         self.num_in_queue = min(self.num_in_queue + 1, self.max_memory_size)
         
     def recall(self):
-        # Randomly sample 'batch size' experiences
+        """ 
+        Randomly sample 'batch size' experiences for updating
+        """
         idx = random.choices(range(self.num_in_queue), k=self.memory_sample_size)
         
         STATE = self.STATE_MEM[idx]
@@ -155,7 +167,10 @@ class DQNAgent:
         self.target_net.load_state_dict(self.local_net.state_dict())
     
     def experience_replay(self):
-        
+        """
+        Samples a batch of experiences using self.recall() to update the CNN weights 
+        using the DDQN- or DQN-update algorithm.
+        """
         if self.double_dq and self.step % self.copy == 0:
             self.copy_model()
 
@@ -172,10 +187,11 @@ class DQNAgent:
         self.optimizer.zero_grad()
         if self.double_dq:
             # Double Q-Learning target is Q*(S, A) <- r + γ max_a Q_target(S', a)
+            # target Q-network for selecting best actions
             target = REWARD + torch.mul((self.gamma * 
                                         self.target_net(STATE2).max(1).values.unsqueeze(1)), 
                                         1 - DONE)
-
+            # current Q-netwok for updating weights 
             current = self.local_net(STATE).gather(1, ACTION.long()) # Local net approximation of Q-value
         else:
             # Q-Learning target is Q*(S, A) <- r + γ max_a Q(S', a) 
@@ -185,7 +201,7 @@ class DQNAgent:
                 
             current = self.dqn(STATE).gather(1, ACTION.long())
         
-        loss = self.l1(current, target)
+        loss = self.l1(current, target) # Huber Loss
         loss.backward() # Compute gradients
         self.optimizer.step() # Backpropagate error
 

@@ -22,139 +22,183 @@ from super_mario_bros.gym_super_mario_bros._app import cli
 
 def run(args):
     """
+    Runs the DDQN or DQN agent on Super Mario Bros. Can specify if training and/or pretrained.
     """
-    training_mode=args.training_mode
-    pretrained=args.pretrained
-    env=args.env
-    eps=args.episodes
-    if args.algorithm == 'ddqn':
-        double_dq = True
-    elif args.algorithm == 'dqn':
-        double_dq = False
-
-
+    env = args.env
     env = gym.make(env)
-    env = make_env(env)  # pre-process env for deep learning
-    observation_space = env.observation_space.shape
-    action_space = env.action_space.n
-    agent = dqn.DQNAgent(state_space=observation_space,
-                        action_space=action_space,
-                        max_memory_size=30000,
-                        batch_size=32,
-                        gamma=0.90,
-                        lr=0.00025,
-                        dropout=0.,
-                        exploration_max=1.0,
-                        exploration_min=0.02,
-                        exploration_decay=0.99,
-                        double_dq=double_dq,
-                        pretrained=pretrained)
-    
+    eps = args.episodes
     num_episodes = eps
-    env.reset()
-    if args.pretrained:
-        if args.algorithm == 'ddqn':
-            total_rewards_pkl = "total_rewards_ddqn.pkl"
-        elif args.algorithm == 'dqn':
-            total_rewards_pkl = "total_rewards_dqn.pkl"
-        with open(total_rewards_pkl, 'rb') as f:
-            total_rewards = pickle.load(f)
-    else:
+    if args.algorithm == "random":
+        env = JoypadSpace(env, RIGHT_ONLY)
+        frames = []
         total_rewards = []
+        for ep_num in tqdm(range(num_episodes)):
+            _ = env.reset()
+            terminal = False
+            progress = tqdm(range(args.steps))
+            total_reward = 0
+            for _ in progress:
+                if terminal:
+                    break
+                action = env.action_space.sample()
 
-    frames = []
-    for ep_num in tqdm(range(num_episodes)):
-        state = env.reset()
-        state = np.array([state])
-        state = torch.Tensor(state)
-        total_reward = 0
-        steps = 0
-        while True:
-            if not training_mode:
-                show_state(env, ep_num)
-            action = agent.act(state)
-            steps += 1
-            
-            # Encode frames for output .mp4
-            action1 = env.action_space.sample()
-            frame = env.render(mode='rgb_array')
-            im = Image.fromarray(frame)
+                # Encode frames for output .mp4
+                frame = env.render(mode='rgb_array')
+                im = Image.fromarray(frame)
 
-            drawer = ImageDraw.Draw(im)
+                drawer = ImageDraw.Draw(im)
 
-            if np.mean(im) < 128:
-                text_color = (255,255,255)
-            else:
-                text_color = (0,0,0)
-            drawer.text((im.size[0]/20,im.size[1]/18), f'Episode: {ep_num+1}', fill=text_color)
+                if np.mean(im) < 128:
+                    text_color = (255,255,255)
+                else:
+                    text_color = (0,0,0)
+                drawer.text((im.size[0]/20,im.size[1]/18), f'Episode: {ep_num+1}', fill=text_color)
 
-            frames.append(im)
-            
-            # Update state, reward and determine if end condition is met
-            state_next, reward, terminal, info = env.step(int(action[0]))
-            print(info)
-            total_reward += reward
-            state_next = np.array([state_next])
-            state_next = torch.Tensor(state_next)
-            reward = torch.tensor([reward]).unsqueeze(0)
-            
-            terminal = torch.tensor([int(terminal)]).unsqueeze(0)
-            
-            if training_mode:
-                agent.remember(state, action, reward, state_next, terminal)
-                agent.experience_replay()
-            
-            state = state_next
-            if terminal:
-                break
+                frames.append(im)
+
+                _, reward, done, info = env.step(action)
+                total_reward += reward
+                terminal = done
+                progress.set_postfix(reward=reward, info=info)
+                # env.render()
+            total_rewards.append(total_reward)
         
-        total_rewards.append(total_reward)
+        # close the environment
+        env.close()
 
-        print("Total reward after episode {} is {}".format(ep_num + 1, total_rewards[-1]))
+        # Rendering runs of the agent to a .mp4 for visualization
+        agent_mp4 = append_file_name("agent", args.algorithm, ".mp4")
+        # imageio.mimwrite(agent_mp4, frames)
 
-        num_episodes += 1      
+        if num_episodes > 500:
+            plot(total_rewards, args.algorithm)
 
-    # Write outputs if we train the agent
-    if training_mode:
-        ending_position_pkl = append_file_name("ending_position", double_dq, ".pkl")
-        num_in_queue_pkl = append_file_name("num_in_queue", double_dq, ".pkl")
-        total_rewards_pkl = append_file_name("total_rewards", double_dq, ".pkl")
-        with open(ending_position_pkl, "wb") as f:
-            pickle.dump(agent.ending_position, f)
-        with open(num_in_queue_pkl, "wb") as f:
-            pickle.dump(agent.num_in_queue, f)
-        with open(total_rewards_pkl, "wb") as f:
-            pickle.dump(total_rewards, f)
-
-        if agent.double_dq:
-            torch.save(agent.local_net.state_dict(), "dq1.pt")
-            torch.save(agent.target_net.state_dict(), "dq2.pt")
+    else:
+        training_mode=args.training_mode
+        pretrained=args.pretrained
+        if args.algorithm == 'ddqn':
+            double_dq = True
+        elif args.algorithm == 'dqn':
+            double_dq = False
         else:
-            torch.save(agent.dqn.state_dict(), "dq.pt")
+            return
 
-        STATE_MEM_pt = append_file_name("STATE_MEM", double_dq, ".pt")
-        ACTION_MEM_pt = append_file_name("ACTION_MEM", double_dq, ".pt")
-        REWARD_MEM_pt = append_file_name("REWARD_MEM", double_dq, ".pt")
-        STATE2_MEM_pt = append_file_name("STATE2_MEM", double_dq, ".pt")
-        DONE_MEM_pt = append_file_name("DONE_MEM", double_dq, ".pt")
-        torch.save(agent.STATE_MEM,  STATE_MEM_pt)
-        torch.save(agent.ACTION_MEM, ACTION_MEM_pt)
-        torch.save(agent.REWARD_MEM, REWARD_MEM_pt)
-        torch.save(agent.STATE2_MEM, STATE2_MEM_pt)
-        torch.save(agent.DONE_MEM,   DONE_MEM_pt)
-    
-    env.close()
+        env = make_env(env)  # pre-process env for deep learning
+        observation_space = env.observation_space.shape # shape of game space (i.e. 4x84x84)
+        action_space = env.action_space.n # num discrete actions in game (i.e. 5)
+        # instantiate DDQN or DQN agent
+        agent = dqn.DQNAgent(state_space=observation_space,
+                            action_space=action_space,
+                            max_memory_size=30000,
+                            batch_size=32,
+                            gamma=0.90,
+                            lr=0.00025,
+                            dropout=0.,
+                            exploration_max=1.0,
+                            exploration_min=0.02,
+                            exploration_decay=0.99,
+                            double_dq=double_dq,
+                            pretrained=pretrained)
+        
+        env.reset()
+        if args.pretrained:
+            if args.algorithm == 'ddqn':
+                total_rewards_pkl = "total_rewards_ddqn.pkl"
+            elif args.algorithm == 'dqn':
+                total_rewards_pkl = "total_rewards_dqn.pkl"
+            with open(total_rewards_pkl, 'rb') as f:
+                total_rewards = pickle.load(f)
+        else:
+            total_rewards = []
 
-    agent_mp4 = append_file_name("agent", double_dq, ".mp4")
-    imageio.mimwrite(agent_mp4, frames)
-    
-    if num_episodes >= 5:
-        plt.title("Episodes trained vs. Average Rewards (per 500 eps)")
-        plt.plot([0 for _ in range(500)] + 
-                 np.convolve(total_rewards, np.ones((500,))/500, mode="valid").tolist())
-        plt.show()
-        reward_plot = append_file_name("plot", double_dq, ".png")
-        plt.savefig()
+        frames = []
+        for ep_num in tqdm(range(num_episodes)):
+            state = env.reset()
+            state = np.array([state])
+            state = torch.Tensor(state)
+            total_reward = 0
+            steps = 0
+            while True:
+                if not training_mode:
+                    show_state(env, ep_num)
+                action = agent.act(state)
+                steps += 1
+                
+                # Encode frames for output .mp4
+                frame = env.render(mode='rgb_array')
+                im = Image.fromarray(frame)
+
+                drawer = ImageDraw.Draw(im)
+
+                if np.mean(im) < 128:
+                    text_color = (255,255,255)
+                else:
+                    text_color = (0,0,0)
+                drawer.text((im.size[0]/20,im.size[1]/18), f'Episode: {ep_num+1}', fill=text_color)
+
+                frames.append(im)
+                
+                # Update state, reward and determine if end condition is met
+                state_next, reward, terminal, info = env.step(int(action[0]))
+                # Use deprecated version of step due to incompatibility with nes-py
+                total_reward += reward
+                state_next = np.array([state_next])
+                state_next = torch.Tensor(state_next)
+                reward = torch.tensor([reward]).unsqueeze(0)
+                
+                terminal = torch.tensor([int(terminal)]).unsqueeze(0)
+                
+                if training_mode:
+                    agent.remember(state, action, reward, state_next, terminal)
+                    agent.experience_replay()
+                
+                state = state_next
+                if terminal:
+                    break
+            
+            total_rewards.append(total_reward)
+
+            print("Total reward after episode {} is {}".format(ep_num + 1, total_rewards[-1]))
+
+            num_episodes += 1      
+
+        # Write outputs if we train the agent
+        if training_mode:
+            ending_position_pkl = append_file_name("ending_position", args.algorithm, ".pkl")
+            num_in_queue_pkl = append_file_name("num_in_queue", args.algorithm, ".pkl")
+            total_rewards_pkl = append_file_name("total_rewards", args.algorithm, ".pkl")
+            with open(ending_position_pkl, "wb") as f:
+                pickle.dump(agent.ending_position, f)
+            with open(num_in_queue_pkl, "wb") as f:
+                pickle.dump(agent.num_in_queue, f)
+            with open(total_rewards_pkl, "wb") as f:
+                pickle.dump(total_rewards, f)
+
+            if agent.double_dq:
+                torch.save(agent.local_net.state_dict(), "dq1.pt")
+                torch.save(agent.target_net.state_dict(), "dq2.pt")
+            else:
+                torch.save(agent.dqn.state_dict(), "dq.pt")
+
+            STATE_MEM_pt = append_file_name("STATE_MEM", args.algorithm, ".pt")
+            ACTION_MEM_pt = append_file_name("ACTION_MEM", args.algorithm, ".pt")
+            REWARD_MEM_pt = append_file_name("REWARD_MEM", args.algorithm, ".pt")
+            STATE2_MEM_pt = append_file_name("STATE2_MEM", args.algorithm, ".pt")
+            DONE_MEM_pt = append_file_name("DONE_MEM", args.algorithm, ".pt")
+            torch.save(agent.STATE_MEM,  STATE_MEM_pt)
+            torch.save(agent.ACTION_MEM, ACTION_MEM_pt)
+            torch.save(agent.REWARD_MEM, REWARD_MEM_pt)
+            torch.save(agent.STATE2_MEM, STATE2_MEM_pt)
+            torch.save(agent.DONE_MEM,   DONE_MEM_pt)
+        
+        env.close()
+
+        # Rendering runs of the agent to a .mp4 for visualization
+        agent_mp4 = append_file_name("agent", args.algorithm, ".mp4")
+        imageio.mimwrite(agent_mp4, frames)
+        
+        if num_episodes > 500:
+            plot(total_rewards, args.algorithm)
 
 def show_state(env, ep=0, info=""):
     plt.figure(3)
@@ -166,29 +210,36 @@ def show_state(env, ep=0, info=""):
     display.clear_output(wait=True)
     display.display(plt.gcf())
 
-def append_file_name(basename, is_ddqn, file_ext):
+def append_file_name(basename, alg, file_ext):
     """
     Transforms given basename into a file name to specify if file relates to ddqn or dqn result.
 
     basename (string): basename for file output
-    is_dqqn (bool): true if result of ddqn, false otherwise
+    alg (string): string representing algorithm
     file_ext (string): file extension for output (MUST INCLUDE ".", e.g. ".pkl" or ".pt")
     """
-    ddqn = "_ddqn" if is_ddqn else "_dqn"
-    return basename + ddqn + file_ext
+    string = "_" + alg
+    return basename + string + file_ext
 
-def plot(total_rewards):
-    # NEED TO CHECK UNPICKLE OR JUST A LIST
-    plt.title("Episodes trained vs. Average Rewards (per 500 eps)")
+def plot(total_rewards, alg):
+    """
+    Plots Average Rewards (per 500 eps) vs. Episodes Trained using rolling window 
+    arithmetic average.
+    """
+    plt.title("Average Rewards (per 500 eps) vs. Episodes Trained")
+    # rolling average window of 500 episodes where arithmetic avg reward 
+    # from ep n to n+500 is the value for episode n+500 (0 for eps 0 to 499)
     plt.plot([0 for _ in range(500)] + 
-            np.convolve(total_rewards, np.ones((500,))/500, mode="valid").tolist())
+                np.convolve(total_rewards, np.ones((500,))/500, mode="valid").tolist())
     plt.show()
-    plt.savefig('')
+    reward_plot = append_file_name("plot", alg, ".png")
+    plt.savefig()
     
 
 def main(args):
     """
-    [INSERT DOCUMENTATION]
+    Runs DDQN or DQN agent depending on algorithm input. 
+    Refers to gym_super_mario_bros if mode is set to human (i.e. user interaction) or random (i.e. random movements).
     """
     if args.mode == 'agent':
         args.env = 'SuperMarioBros-1-1-v0'
@@ -218,8 +269,8 @@ if __name__ == "__main__":
     parser.add_argument('--algorithm', '-alg',
         type=str,
         default='ddqn',
-        choices=['ddqn', 'dqn'],
-        help='ddqn for Double Deep Q-Network; dqn for Deep Q-Network'
+        choices=['ddqn', 'dqn', 'random'],
+        help='ddqn for Double Deep Q-Network; dqn for Deep Q-Network; random for random'
     )
     parser.add_argument('--env', '-e',
         type=str,
