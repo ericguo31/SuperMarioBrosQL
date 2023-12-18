@@ -31,7 +31,12 @@ def run(args):
     if args.algorithm == "random":
         env = JoypadSpace(env, RIGHT_ONLY)
         frames = []
-        total_rewards = []
+        if args.pretrained:
+            total_rewards_pkl = append_file_name("total_rewards", args.algorithm, ".pkl")
+            with open(total_rewards_pkl, 'rb') as f:
+                total_rewards = pickle.load(f)
+        else:
+            total_rewards = []
         for ep_num in tqdm(range(num_episodes)):
             _ = env.reset()
             terminal = False
@@ -62,16 +67,20 @@ def run(args):
                 progress.set_postfix(reward=reward, info=info)
                 # env.render()
             total_rewards.append(total_reward)
+            total_rewards_pkl = append_file_name("total_rewards", args.algorithm, ".pkl")
+            with open(total_rewards_pkl, "wb") as f:
+                pickle.dump(total_rewards, f)
         
         # close the environment
         env.close()
 
         # Rendering runs of the agent to a .mp4 for visualization
         agent_mp4 = append_file_name("agent", args.algorithm, ".mp4")
-        # imageio.mimwrite(agent_mp4, frames)
+        imageio.mimwrite(agent_mp4, frames)
 
-        if num_episodes > 500:
-            plot(total_rewards, args.algorithm)
+        window = 500 # sliding window for rolling avg calculation
+        if num_episodes > window:
+            plot(total_rewards, args.algorithm, False, window)
 
     else:
         training_mode=args.training_mode
@@ -197,8 +206,9 @@ def run(args):
         agent_mp4 = append_file_name("agent", args.algorithm, ".mp4")
         imageio.mimwrite(agent_mp4, frames)
         
-        if num_episodes > 500:
-            plot(total_rewards, args.algorithm)
+        window = 500 # sliding window for rolling avg calculation
+        if num_episodes > window:
+            plot(total_rewards, args.algorithm, False, window)
 
 def show_state(env, ep=0, info=""):
     plt.figure(3)
@@ -215,22 +225,32 @@ def append_file_name(basename, alg, file_ext):
     Transforms given basename into a file name to specify if file relates to ddqn or dqn result.
 
     basename (string): basename for file output
-    alg (string): string representing algorithm
+    alg (string): denotes type of agent; one of ["ddqn", "dqn", "random"]
     file_ext (string): file extension for output (MUST INCLUDE ".", e.g. ".pkl" or ".pt")
     """
     string = "_" + alg
     return basename + string + file_ext
 
-def plot(total_rewards, alg):
+def plot(total_rewards, alg, pre_pkl, n):
     """
-    Plots Average Rewards (per 500 eps) vs. Episodes Trained using rolling window 
+    Plots Average Rewards (per n eps) vs. Episodes Trained using rolling window 
     arithmetic average.
+
+    total_rewards (list): list of rewards from agent
+    alg (string): denotes type of agent; one of ["ddqn", "dqn", "random"]
+    pre_pkl (bool): True if .pkl file exists for total_rewards, False otherwise
+    n (int): size of sliding window for rolling average in plot
     """
-    plt.title("Average Rewards (per 500 eps) vs. Episodes Trained")
+    # check if preload with .pkl file
+    if pre_pkl:  
+        total_rewards_pkl = append_file_name("total_rewards", alg, ".pkl")
+        with open(total_rewards_pkl, 'rb') as f:
+            total_rewards = pickle.load(f)
+        plt.title("Average Rewards (per 500 eps) vs. Episodes Trained")
     # rolling average window of 500 episodes where arithmetic avg reward 
-    # from ep n to n+500 is the value for episode n+500 (0 for eps 0 to 499)
-    plt.plot([0 for _ in range(500)] + 
-                np.convolve(total_rewards, np.ones((500,))/500, mode="valid").tolist())
+    # from ep m to m+n is the value for episode m+n (0 for eps 0 to n-1)
+    plt.plot([0 for _ in range(n)] + 
+                np.convolve(total_rewards, np.ones((n,))/n, mode="valid").tolist())
     plt.show()
     reward_plot = append_file_name("plot", alg, ".png")
     plt.savefig()
@@ -279,7 +299,7 @@ if __name__ == "__main__":
     )
     parser.add_argument('--mode', '-m',
         type=str,
-        default='human',
+        default='agent',
         choices=['human', 'random', 'agent'],
         help='The execution mode for the emulation'
     )

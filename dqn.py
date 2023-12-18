@@ -14,8 +14,7 @@ class DQNSolver(nn.Module):
     """
     The Deep Q-Network is created as a 5-layer CNN (convolutional neural net) with 
     three convolutional layers and two linear layers, which works well for image-based 
-    problems. By pre-processing env, we converted a 240x256x3 (h x w x RGB) image from
-    the game into 
+    problems.
     """
     def __init__(self, input_shape, n_actions):
         super(DQNSolver, self).__init__()
@@ -148,9 +147,16 @@ class DQNAgent:
         
         return STATE, ACTION, REWARD, STATE2, DONE
 
+    def copy_model(self):
+        """
+        Copy local network weights into target network. Used for DDQN.
+        """
+        self.target_net.load_state_dict(self.local_net.state_dict())
+
     def act(self, state):
-        # Epsilon-greedy action
-        
+        """
+        Epsilon-greedy action. Policy to determine action is dependent on if DDQN.
+        """
         if self.double_dq:
             self.step += 1
         if random.random() < self.exploration_rate:  
@@ -160,11 +166,6 @@ class DQNAgent:
             return torch.argmax(self.local_net(state.to(self.device))).unsqueeze(0).unsqueeze(0).cpu()
         else:
             return torch.argmax(self.dqn(state.to(self.device))).unsqueeze(0).unsqueeze(0).cpu()
-
-    def copy_model(self):
-        # Copy local net weights into target net
-        
-        self.target_net.load_state_dict(self.local_net.state_dict())
     
     def experience_replay(self):
         """

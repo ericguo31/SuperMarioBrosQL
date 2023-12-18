@@ -111,6 +111,14 @@ class BufferWrapper(gym.ObservationWrapper):
 
 
 def make_env(env):
+    """
+    Pre-processes the environment for more efficient deep learning:
+    - Performs max pooling by "skipping" every fourth frame
+    - 240x256x3 (h x w x RGB channels) into 84 x 84 x 1 image
+    - Convert image to pytorch tensor
+    - Appies buffer wrapper for temporal difference learning
+    - Normalize pixel values for greyscale
+    """
     env = MaxAndSkipEnv(env)
     env = ProcessFrame84(env)
     env = ImageToPyTorch(env)
