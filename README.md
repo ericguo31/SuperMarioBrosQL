@@ -1,6 +1,4 @@
 # SuperMarioBrosQL
-CS 4701 Final Project by Eric Guo and Ben Wu (Cornell University, 2023)
-
 SuperMarioBrosQL is an exploratory research project into a use case for the Double 
 Deep Q-Network (DDQN) algorithm on Super Mario Bros. World 1-1. We used [gym-super-mario-bros](https://pypi.org/project/gym-super-mario-bros/) 
 for our display of the game, and we implemented the DDQN agent with guidance from [PyTorch](https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html), [Andrew Grebenisan](https://blog.paperspace.com/building-double-deep-q-network-super-mario-bros/), and the [DDQN paper](https://arxiv.org/abs/1509.06461) itself. 
