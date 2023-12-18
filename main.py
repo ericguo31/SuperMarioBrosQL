@@ -223,7 +223,7 @@ def append_file_name(basename, alg, file_ext):
     Transforms given basename into a file name to specify if file relates to ddqn or dqn result.
 
     basename (string): basename for file output
-    alg (string): string representing algorithm
+    alg (string): denotes type of agent; one of ["ddqn", "dqn", "random"]
     file_ext (string): file extension for output (MUST INCLUDE ".", e.g. ".pkl" or ".pt")
     """
     string = "_" + alg
@@ -233,8 +233,16 @@ def plot(total_rewards, alg):
     """
     Plots Average Rewards (per 500 eps) vs. Episodes Trained using rolling window 
     arithmetic average.
+
+    total_rewards (list): list of rewards from agent
+    alg (string): denotes type of agent; one of ["ddqn", "dqn", "random"]
     """
-    plt.title("Average Rewards (per 500 eps) vs. Episodes Trained")
+    # check if preload with .pkl file
+    if len(total_rewards) == 0:  
+        total_rewards_pkl = append_file_name("total_rewards", alg, ".pkl")
+        with open(total_rewards_pkl, 'rb') as f:
+            total_rewards = pickle.load(f)
+        plt.title("Average Rewards (per 500 eps) vs. Episodes Trained")
     # rolling average window of 500 episodes where arithmetic avg reward 
     # from ep n to n+500 is the value for episode n+500 (0 for eps 0 to 499)
     plt.plot([0 for _ in range(500)] + 
@@ -251,7 +259,8 @@ def main(args):
     """
     if args.mode == 'agent':
         args.env = 'SuperMarioBros-1-1-v0'
-        run(args)
+        plot([], "random")
+        # run(args)
     else:
         cli.main()
 
@@ -287,7 +296,7 @@ if __name__ == "__main__":
     )
     parser.add_argument('--mode', '-m',
         type=str,
-        default='human',
+        default='agent',
         choices=['human', 'random', 'agent'],
         help='The execution mode for the emulation'
     )

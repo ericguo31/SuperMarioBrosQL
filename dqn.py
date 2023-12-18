@@ -14,8 +14,7 @@ class DQNSolver(nn.Module):
     """
     The Deep Q-Network is created as a 5-layer CNN (convolutional neural net) with 
     three convolutional layers and two linear layers, which works well for image-based 
-    problems. By pre-processing env, we converted a 240x256x3 (h x w x RGB) image from
-    the game into 
+    problems.
     """
     def __init__(self, input_shape, n_actions):
         super(DQNSolver, self).__init__()
